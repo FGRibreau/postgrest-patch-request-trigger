@@ -1,0 +1,60 @@
+version: "3"
+
+# greatly inspired by: https://github.com/mattddowney/compose-postgrest
+
+services:
+  ################
+  # postgrest-db #
+  ################
+  postgrest-db:
+    container_name: postgrest-db
+    image: postgres:13-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - DB_ANON_ROLE=${DB_ANON_ROLE}
+      - DB_SCHEMA=${DB_SCHEMA}
+    volumes:
+      # anything in initdb directory is created in the database
+      # see "How to extend this image" section at https://hub.docker.com/r/_/postgres/
+      - "./initdb:/docker-entrypoint-initdb.d"
+    networks:
+      - postgrest-backend
+    restart: always
+
+  ##################
+  # postgrest-demo #
+  ##################
+  postgrest-demo:
+    container_name: postgrest-demo
+    image: nginx:mainline-alpine
+    ports:
+      - "80:80"
+    restart: always
+
+  #############
+  # postgrest #
+  #############
+  postgrest:
+    container_name: postgrest
+    image: postgrest/postgrest:v7.0.1
+    ports:
+      - "3000:3000"
+    environment:
+      # The standard connection URI format, documented at
+      # https://www.postgresql.org/docs/current/static/libpq-connect.html#LIBPQ-CONNSTRING
+      - PGRST_DB_URI=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgrest-db:5432/${POSTGRES_DB}
+      # The name of which database schema to expose to REST clients
+      - PGRST_DB_SCHEMA=${DB_SCHEMA}
+      # The database role to use when no client authentication is provided
+      - PGRST_DB_ANON_ROLE=${DB_ANON_ROLE}
+    networks:
+      - postgrest-backend
+    restart: always
+
+networks:
+  postgrest-backend:
+    driver: bridge
